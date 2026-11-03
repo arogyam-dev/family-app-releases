@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.family.tables"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -30,7 +26,12 @@
           "microphonePermission": "Tables listens to hear your answers.",
           "speechRecognitionPermission": "Tables uses speech recognition to check your answers."
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-font"
+    ],
+    "platforms": [
+      "android"
     ]
   }
 }

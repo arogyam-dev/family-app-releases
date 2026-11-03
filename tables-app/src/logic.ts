@@ -1,32 +1,40 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const MAX_MULT = 10;
-export const LEVEL_WEIGHTS = [50, 25, 13, 7, 5]; // L1..L5
-export const TIMEOUT_MS = 10000;
+export const LEVEL_WEIGHTS = [50, 25, 13, 7, 5]; // chance of drawing from L1..L5
+export const STREAK_TO_LEVEL_UP = [4, 3, 3, 2]; // fast-correct answers in a row to leave L1..L4
+export const TIMEOUT_MS = 15000;
+export const UP_TO_OPTIONS = [10, 12, 15, 20];
 
 export type Fact = { l: number; s: number }; // level 1-5, fast-correct streak
 export type Mastery = Record<string, Fact>;
 export type Q = { a: number; b: number };
+export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number };
+export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0 };
 
+export function range(a: number, b: number) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
 export const key = ({ a, b }: Q) => `${a}x${b}`;
 export const fact = (m: Mastery, q: Q): Fact => m[key(q)] ?? { l: 1, s: 0 };
-const fastMs = ({ a, b }: Q) => (a > 10 || b > 10 ? 4500 : 3000);
+export const facts = (tables: number[], upTo: number): Q[] => tables.flatMap(a => range(1, upTo).map(b => ({ a, b })));
+/** Time allowed for a "fast" answer: 3s up to 10×10, 5s when one side is over 10, 6s when both are. */
+export const fastMs = ({ a, b }: Q) => [3000, 5000, 6000][+(a > 10) + +(b > 10)];
 
-const STORE = 'mastery';
-export const loadMastery = async (): Promise<Mastery> => JSON.parse((await AsyncStorage.getItem(STORE)) ?? '{}');
-export const saveMastery = (m: Mastery) => AsyncStorage.setItem(STORE, JSON.stringify(m));
+const load = async <T,>(k: string, d: T): Promise<T> => ({ ...d, ...JSON.parse((await AsyncStorage.getItem(k)) ?? '{}') });
+const save = (k: string) => (v: object) => AsyncStorage.setItem(k, JSON.stringify(v)).catch(() => {});
+export const loadMastery = () => load<Mastery>('mastery', {});
+export const saveMastery = save('mastery');
+export const loadSettings = () => load('settings', DEFAULT_SETTINGS);
+export const saveSettings = save('settings');
 
-/** Fast correct builds a streak (2 to level up, 3 for 4→5); slow correct resets it; wrong drops a level. */
+/** Fast correct builds a streak (longer streaks needed at lower levels); slow correct resets it; wrong drops a level. */
 export function grade(f: Fact, q: Q, correct: boolean, ms: number): Fact {
   if (!correct) return { l: Math.max(1, f.l - 1), s: 0 };
   if (ms > fastMs(q)) return { l: f.l, s: 0 };
   const s = f.s + 1;
-  return s >= (f.l >= 4 ? 3 : 2) && f.l < 5 ? { l: f.l + 1, s: 0 } : { l: f.l, s };
+  return f.l < 5 && s >= STREAK_TO_LEVEL_UP[f.l - 1] ? { l: f.l + 1, s: 0 } : { l: f.l, s };
 }
 
 /** Pick a level by weight (empty levels skipped), then a random fact in it, avoiding `last`. */
-export function pick(m: Mastery, tables: number[], last?: Q): Q {
-  const all = tables.flatMap(a => Array.from({ length: MAX_MULT }, (_, i) => ({ a, b: i + 1 })));
+export function pick(m: Mastery, all: Q[], last?: Q): Q {
   const pool = all.length > 1 && last ? all.filter(q => key(q) !== key(last)) : all;
   const byLevel = [1, 2, 3, 4, 5].map(l => pool.filter(q => fact(m, q).l === l));
   const total = byLevel.reduce((t, qs, i) => t + (qs.length ? LEVEL_WEIGHTS[i] : 0), 0);
@@ -34,6 +42,9 @@ export function pick(m: Mastery, tables: number[], last?: Q): Q {
   const qs = byLevel.find((qs, i) => qs.length && (r -= LEVEL_WEIGHTS[i]) < 0) ?? pool;
   return qs[Math.floor(Math.random() * qs.length)];
 }
+
+/** Points for a correct answer: 10, +5 if fast, +2 per combo step (capped). */
+export const points = (q: Q, ms: number, combo: number) => 10 + (ms <= fastMs(q) ? 5 : 0) + 2 * Math.min(combo, 10);
 
 const ONES: Record<string, number> = {
   zero: 0, oh: 0, one: 1, won: 1, two: 2, to: 2, too: 2, three: 3, tree: 3, four: 4, for: 4, five: 5, six: 6,
