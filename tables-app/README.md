@@ -37,6 +37,17 @@ Tunables are at the top of `src/logic.ts`.
 - 1–3 stars per game, a lifetime star count, and a high score 🏆.
 - 👑 on a table once every fact in it is a dragon.
 
+## Insights
+
+The Insights screen (from Home) shows:
+
+- Mastered facts, accuracy, average speed and games played.
+- How many facts are at each level.
+- A heat map of every fact (tap a square for details).
+- The strongest tables and those that need practice.
+- The most-missed and slowest facts.
+- A chart of recent games.
+
 ## Audio
 
 Voice clips are pre-rendered with [Kokoro TTS](https://github.com/thewh1teagle/kokoro-onnx) (voice `af_heart`, pitched up for a child-like sound), so they work offline. Sound effects are synthesized.

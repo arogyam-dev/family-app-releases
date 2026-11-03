@@ -4,11 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Fredoka_500Medium, Fredoka_700Bold, useFonts } from '@expo-google-fonts/fredoka';
 import Game from './src/Game';
+import Insights from './src/Insights';
 import { DEFAULT_SETTINGS, loadMastery, loadSettings, Mastery, saveMastery, saveSettings, Settings } from './src/logic';
 import { GameSummary, Home, Results, Setup, Splash, TableList, TableView } from './src/screens';
 
 type Route =
-  | { name: 'splash' | 'home' | 'tables' | 'setup' }
+  | { name: 'splash' | 'home' | 'tables' | 'setup' | 'insights' }
   | { name: 'table'; n: number }
   | { name: 'game'; id: number }
   | { name: 'results'; summary: GameSummary };
@@ -40,7 +41,8 @@ export default function App() {
   const play = () => go({ name: 'game', id: Date.now() });
   const home = () => go({ name: 'home' });
   const finish = (summary: GameSummary) => {
-    updateSettings({ stars: settings.stars + summary.stars, ...(summary.best && { best: summary.points }) });
+    const log = { at: Date.now(), correct: summary.results.filter(r => r.correct).length, total: summary.results.length, points: summary.points };
+    updateSettings({ stars: settings.stars + summary.stars, history: [...settings.history, log].slice(-50), ...(summary.best && { best: summary.points }) });
     go({ name: 'results', summary });
   };
 
@@ -48,7 +50,8 @@ export default function App() {
   const screen = () => {
     switch (route.name) {
       case 'splash': return <Splash onDone={home} />;
-      case 'home': return <Home mastery={mastery} settings={settings} onView={() => go({ name: 'tables' })} onPlay={() => go({ name: 'setup' })} />;
+      case 'home': return <Home settings={settings} onView={() => go({ name: 'tables' })} onPlay={() => go({ name: 'setup' })} onInsights={() => go({ name: 'insights' })} />;
+      case 'insights': return <Insights mastery={mastery} settings={settings} onBack={home} />;
       case 'tables': return <TableList mastery={mastery} settings={settings} onSettings={updateSettings} onPick={n => go({ name: 'table', n })} onBack={home} />;
       case 'table': return <TableView n={route.n} mastery={mastery} upTo={settings.upTo} onBack={() => go({ name: 'tables' })} />;
       case 'setup': return <Setup settings={settings} onSettings={updateSettings} onStart={play} onBack={home} />;

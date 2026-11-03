@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { fact, facts, Mastery, Q, range, Settings, UP_TO_OPTIONS } from './logic';
 import { say, sfx } from './sound';
-import { Btn, C, Confetti, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, T, Tile } from './ui';
+import { Btn, C, Confetti, LEVEL_NAMES, Pop, Screen, T, Tile } from './ui';
 
 export type Result = { q: Q; correct: boolean; ms: number; from: number; to: number };
 export type GameSummary = { results: Result[]; points: number; best: boolean; stars: number };
 
-const emoji = (l: number) => LEVEL_NAMES[l - 1].split(' ')[1];
+export const emoji = (l: number) => LEVEL_NAMES[l - 1].split(' ')[1];
 
 export function Splash({ onDone }: { onDone: () => void }) {
   const v = useRef(new Animated.Value(0)).current;
@@ -28,31 +28,18 @@ export function Splash({ onDone }: { onDone: () => void }) {
   );
 }
 
-export function Home({ mastery, settings, onView, onPlay }: { mastery: Mastery; settings: Settings; onView: () => void; onPlay: () => void }) {
-  const all = facts(range(1, 20), settings.upTo);
-  const counts = [1, 2, 3, 4, 5].map(l => all.filter(q => fact(mastery, q).l === l).length);
-  return (
-    <Screen>
-      <View style={s.topBar}><View style={s.pill}><T bold style={{ fontSize: 20 }}>⭐ {settings.stars}</T></View><View style={s.pill}><T bold style={{ fontSize: 20 }}>🏆 {settings.best}</T></View></View>
-      <View style={[s.center, { gap: 18 }]}>
-        <T style={{ fontSize: 90 }}>🦉</T>
-        <T bold style={s.h1}>Tables</T>
-        <Btn title="📖  View Tables" onPress={onView} style={s.wide} />
-        <Btn title="🎮  Play!" onPress={onPlay} color={C.good} style={s.wide} />
-        <T bold style={[s.label, { marginTop: 16 }]}>Your fact family</T>
-        <View style={s.levels}>
-          {counts.map((n, i) => (
-            <View key={i} style={[s.level, { backgroundColor: LEVEL_COLORS[i] }]}>
-              <T style={{ fontSize: 26 }}>{emoji(i + 1)}</T>
-              <T bold style={s.levelN}>{n}</T>
-            </View>
-          ))}
-        </View>
-        <T style={s.muted}>Answer fast to grow eggs into dragons!</T>
-      </View>
-    </Screen>
-  );
-}
+export const Home = ({ settings, onView, onPlay, onInsights }: { settings: Settings; onView: () => void; onPlay: () => void; onInsights: () => void }) => (
+  <Screen>
+    <View style={s.topBar}><View style={s.pill}><T bold style={{ fontSize: 20 }}>⭐ {settings.stars}</T></View><View style={s.pill}><T bold style={{ fontSize: 20 }}>🏆 {settings.best}</T></View></View>
+    <View style={[s.center, { gap: 18 }]}>
+      <T style={{ fontSize: 90 }}>🦉</T>
+      <T bold style={s.h1}>Tables</T>
+      <Btn title="🎮  Play!" onPress={onPlay} color={C.good} style={s.wide} />
+      <Btn title="📖  View Tables" onPress={onView} style={s.wide} />
+      <Btn title="📊  Insights" onPress={onInsights} color="#E17055" style={s.wide} />
+    </View>
+  </Screen>
+);
 
 export const UpToPicker = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => (
   <View style={{ gap: 8 }}>
@@ -156,9 +143,6 @@ const s = StyleSheet.create({
   pill: { backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, elevation: 2 },
   h1: { fontSize: 52, color: C.primary, marginTop: -12 },
   wide: { width: '85%' },
-  levels: { flexDirection: 'row', gap: 8 },
-  level: { width: 60, paddingVertical: 8, borderRadius: 16, alignItems: 'center' },
-  levelN: { color: '#fff', fontSize: 20 },
   muted: { color: C.muted, fontSize: 16, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: '4%', rowGap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, padding: 14, borderRadius: 18, elevation: 1 },

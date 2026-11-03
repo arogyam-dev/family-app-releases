@@ -5,11 +5,13 @@ export const STREAK_TO_LEVEL_UP = [4, 3, 3, 2]; // fast-correct answers in a row
 export const TIMEOUT_MS = 15000;
 export const UP_TO_OPTIONS = [10, 12, 15, 20];
 
-export type Fact = { l: number; s: number }; // level 1-5, fast-correct streak
+/** l: level 1-5, s: fast-correct streak, n: attempts, w: wrong, t: total ms of correct answers */
+export type Fact = { l: number; s: number; n?: number; w?: number; t?: number };
 export type Mastery = Record<string, Fact>;
 export type Q = { a: number; b: number };
-export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number };
-export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0 };
+export type GameLog = { at: number; correct: number; total: number; points: number };
+export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number; history: GameLog[] };
+export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0, history: [] };
 
 export function range(a: number, b: number) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
 export const key = ({ a, b }: Q) => `${a}x${b}`;
@@ -27,10 +29,11 @@ export const saveSettings = save('settings');
 
 /** Fast correct builds a streak (longer streaks needed at lower levels); slow correct resets it; wrong drops a level. */
 export function grade(f: Fact, q: Q, correct: boolean, ms: number): Fact {
-  if (!correct) return { l: Math.max(1, f.l - 1), s: 0 };
-  if (ms > fastMs(q)) return { l: f.l, s: 0 };
+  const stats = { n: (f.n ?? 0) + 1, w: (f.w ?? 0) + +!correct, t: (f.t ?? 0) + (correct ? ms : 0) };
+  if (!correct) return { ...stats, l: Math.max(1, f.l - 1), s: 0 };
+  if (ms > fastMs(q)) return { ...stats, l: f.l, s: 0 };
   const s = f.s + 1;
-  return f.l < 5 && s >= STREAK_TO_LEVEL_UP[f.l - 1] ? { l: f.l + 1, s: 0 } : { l: f.l, s };
+  return { ...stats, ...(f.l < 5 && s >= STREAK_TO_LEVEL_UP[f.l - 1] ? { l: f.l + 1, s: 0 } : { l: f.l, s }) };
 }
 
 /** Pick a level by weight (empty levels skipped), then a random fact in it, avoiding `last`. */
