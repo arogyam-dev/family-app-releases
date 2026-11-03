@@ -2,22 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ExpoSpeechRecognitionModule as Speech, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { fact, facts, grade, key, Mastery, parseNumber, pick, points, Q, Settings, TIMEOUT_MS } from './logic';
+import { fact, facts, grade, Grand, key, Mastery, parseNumber, pick, points, Q, Settings, TIMEOUT_MS, unlocks } from './logic';
 import type { GameSummary, Result } from './screens';
 import { pickOne, say, sfx, stopVoice } from './sound';
+import { TrophyUnlock } from './Trophies';
 import { C, Confetti, F, Hatch, Keypad, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, Segment, T } from './ui';
 
 type Phase = 'speak' | 'ask' | 'right' | 'wrong';
-type Props = { settings: Settings; mastery: Mastery; onUpdate: (m: Mastery) => void; onSettings: (p: Partial<Settings>) => void; onDone: (s: GameSummary) => void; onBack: () => void };
+type Props = { settings: Settings; tables?: number[]; mastery: Mastery; onUpdate: (m: Mastery) => void; onSettings: (p: Partial<Settings>) => void; onDone: (s: GameSummary) => void; onBack: () => void };
 
 const PRAISE = ['Awesome! 🎉', 'Great job! 🌟', 'You got it! 🙌', 'Super star! ⭐', 'Amazing! 🤩', 'Well done! 👏', 'Brilliant! 💡', 'Woohoo! 🥳'];
 const COMBOS: Record<number, string> = { 3: 'combo3', 5: 'combo5', 10: 'combo10' };
 const NO_MIC = 'No microphone. Use the keypad.';
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-export default function Game({ settings, mastery, onUpdate, onSettings, onDone, onBack }: Props) {
+export default function Game({ settings, tables, mastery, onUpdate, onSettings, onDone, onBack }: Props) {
   const { count, keypad } = settings;
-  const all = useRef(facts(settings.tables, settings.upTo)).current;
+  const all = useRef(facts(tables ?? settings.tables, settings.upTo)).current;
   const [q, setQ] = useState<Q>(() => pick(mastery, all));
   const [phase, setPhase] = useState<Phase>('speak');
   const [heard, setHeard] = useState('');
@@ -25,7 +26,8 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
   const [praise, setPraise] = useState('');
   const [levelUp, setLevelUp] = useState<[number, number] | null>(null);
   const [micError, setMicError] = useState('');
-  const st = useRef({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), alive: true, combo: 0, points: 0, results: [] as Result[], retry: [] as { q: Q; at: number }[] }).current;
+  const [unlock, setUnlock] = useState<{ tables: number[]; grands: Grand[] } | null>(null);
+  const st = useRef({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), alive: true, combo: 0, points: 0, results: [] as Result[], trophies: settings.trophies, won: [] as number[], retry: [] as { q: Q; at: number }[] }).current;
   const go = (p: Phase) => { st.phase = p; setPhase(p); };
 
   const listen = () => Speech.start({ lang: 'en-US', interimResults: true, continuous: false, maxAlternatives: 3 });
@@ -58,6 +60,19 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
       if (up) { setLevelUp([from.l, to.l]); setTimeout(() => sfx('levelup'), 250); }
       const clip = COMBOS[st.combo] ?? (up ? 'levelup' : Math.random() < 0.5 ? `praise${1 + Math.floor(Math.random() * 8)}` : '');
       await Promise.all([wait(1400), clip && wait(200).then(() => say(clip))]);
+      const { fresh, grands, all: have } = unlocks(st.m, settings.upTo, st.trophies);
+      if (fresh.length && st.alive) {
+        st.trophies = have; st.won.push(...fresh);
+        onSettings({ trophies: have });
+        setUnlock({ tables: fresh, grands });
+        sfx('fanfare');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        await wait(700);
+        for (const t of fresh) await say(`trophy${t}`);
+        for (const g of grands) await say(g.id);
+        await wait(1200);
+        setUnlock(null);
+      }
     } else {
       st.combo = 0;
       st.retry.push({ q: st.q, at: n + 3 + Math.floor(Math.random() * 3) });
@@ -70,7 +85,7 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
     if (!st.alive) return;
     if (n >= count) {
       const pct = st.results.filter(r => r.correct).length / n;
-      return onDone({ results: st.results, points: st.points, best: st.points > settings.best, stars: pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : 1 });
+      return onDone({ results: st.results, trophies: st.won, points: st.points, best: st.points > settings.best, stars: pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : 1 });
     }
     const due = st.retry.findIndex(r => r.at <= n && key(r.q) !== key(st.q));
     ask(due >= 0 ? st.retry.splice(due, 1)[0].q : pick(st.m, all, st.q));
@@ -125,6 +140,7 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
       </View>
       {keypad && <Keypad value={typed} onChange={setTyped} onSubmit={() => answer(+typed === q.a * q.b)} disabled={done} />}
       {phase === 'right' && <Confetti key={num} count={st.combo >= 5 ? 70 : 35} />}
+      {unlock && <TrophyUnlock {...unlock} />}
     </Screen>
   );
 }

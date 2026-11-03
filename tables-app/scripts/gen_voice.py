@@ -27,9 +27,12 @@ PHRASES = {
     "combo3": "Three in a row!", "combo5": "Five in a row! You're on fire!", "combo10": "Ten in a row! Unstoppable!",
     "levelup": "Level up!", "tryagain": "Nice try!", "done": "Great game! Look at your score!",
     "best": "Wow! A new high score!",
+    "grand1": "Amazing! You are the Times Tables Champion!",
+    "grand2": "Incredible! You are a Legend of Tables! You mastered every table!",
 }
 clips = dict(PHRASES)
 for a in range(1, MAX + 1):
+    clips[f"trophy{a}"] = f"Hooray! You won the trophy for the table of {words(a)}!"
     for b in range(1, MAX + 1):
         clips[f"q{a}x{b}"] = f"What is {words(a)} times {words(b)}?"
         clips[f"a{a}x{b}"] = f"{words(a)} times {words(b)} is {words(a * b)}."

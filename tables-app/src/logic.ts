@@ -10,8 +10,8 @@ export type Fact = { l: number; s: number; n?: number; w?: number; t?: number };
 export type Mastery = Record<string, Fact>;
 export type Q = { a: number; b: number };
 export type GameLog = { at: number; correct: number; total: number; points: number };
-export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number; history: GameLog[] };
-export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0, history: [] };
+export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number; history: GameLog[]; trophies: number[] };
+export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0, history: [], trophies: [] };
 
 export function range(a: number, b: number) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
 export const key = ({ a, b }: Q) => `${a}x${b}`;
@@ -44,6 +44,23 @@ export function pick(m: Mastery, all: Q[], last?: Q): Q {
   let r = Math.random() * total;
   const qs = byLevel.find((qs, i) => qs.length && (r -= LEVEL_WEIGHTS[i]) < 0) ?? pool;
   return qs[Math.floor(Math.random() * qs.length)];
+}
+
+/** Grand prizes, unlocked by holding every trophy in `tables`. */
+export const GRANDS = [
+  { id: 'grand1', name: 'Times Tables Champion', icon: '👑', tables: range(1, 12) },
+  { id: 'grand2', name: 'Legend of Tables', icon: '🐉', tables: range(1, 20) },
+];
+export type Grand = (typeof GRANDS)[number];
+
+/** Dragons so far in table `a` (out of `upTo`); a trophy is earned when all are dragons. */
+export const dragons = (m: Mastery, a: number, upTo: number) => facts([a], upTo).filter(q => fact(m, q).l === 5).length;
+/** Trophies newly earned from mastery `m`, and grand prizes they complete. Earned trophies are never taken away. */
+export function unlocks(m: Mastery, upTo: number, have: number[]) {
+  const fresh = range(1, 20).filter(a => !have.includes(a) && dragons(m, a, upTo) === upTo);
+  const all = [...have, ...fresh];
+  const grands = GRANDS.filter(g => g.tables.every(a => all.includes(a)) && !g.tables.every(a => have.includes(a)));
+  return { fresh, grands, all };
 }
 
 /** Points for a correct answer: 10, +5 if fast, +2 per combo step (capped). */

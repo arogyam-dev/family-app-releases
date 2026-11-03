@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { fact, facts, Mastery, Q, range, Settings, UP_TO_OPTIONS } from './logic';
 import { say, sfx } from './sound';
+import { Trophy } from './Trophies';
 import { Btn, C, Confetti, creature, F, Hatch, LEVEL_NAMES, Pop, Screen, T, Tile } from './ui';
 
 export type Result = { q: Q; correct: boolean; ms: number; from: number; to: number };
-export type GameSummary = { results: Result[]; points: number; best: boolean; stars: number };
+export type GameSummary = { results: Result[]; trophies: number[]; points: number; best: boolean; stars: number };
 
 export function Splash({ onDone }: { onDone: () => void }) {
   const v = useRef(new Animated.Value(0)).current;
@@ -27,7 +28,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
 }
 
 /** The home mascot grows with the average mastery of the chosen tables. */
-export function Home({ mastery, settings, onView, onPlay, onInsights }: { mastery: Mastery; settings: Settings; onView: () => void; onPlay: () => void; onInsights: () => void }) {
+export function Home({ mastery, settings, onView, onPlay, onInsights, onTrophies }: { mastery: Mastery; settings: Settings; onView: () => void; onPlay: () => void; onInsights: () => void; onTrophies: () => void }) {
   const qs = facts(settings.tables.length ? settings.tables : range(1, 12), settings.upTo);
   const avg = qs.reduce((t, q) => t + fact(mastery, q).l, 0) / qs.length;
   const stage = Math.min(5, Math.floor(avg)), grow = stage === 5 ? 1 : avg - stage;
@@ -36,7 +37,7 @@ export function Home({ mastery, settings, onView, onPlay, onInsights }: { master
     <Screen>
       <View style={s.topBar}>
         <View style={s.pill}><T bold style={s.pillText}>⭐ {settings.stars}</T></View>
-        <View style={s.pill}><T bold style={s.pillText}>🏆 {settings.best}</T></View>
+        <Pressable onPress={onTrophies} style={s.pill}><T bold style={s.pillText}>🏆 {settings.trophies.length}/20</T></Pressable>
       </View>
       <View style={s.center}>
         <Pop><T style={{ fontSize: 140 }}>{creature(stage)}</T></Pop>
@@ -47,7 +48,8 @@ export function Home({ mastery, settings, onView, onPlay, onInsights }: { master
       <View style={{ gap: 12, paddingBottom: 8 }}>
         <Btn title="Play!" onPress={onPlay} color={C.good} style={{ paddingVertical: 24 }} />
         <View style={s.chips}>
-          <Btn soft small title="View tables" onPress={onView} style={[s.chip, s.tall]} />
+          <Btn soft small title="Tables" onPress={onView} style={[s.chip, s.tall]} />
+          <Btn soft small title="Trophies" onPress={onTrophies} style={[s.chip, s.tall]} />
           <Btn soft small title="Insights" onPress={onInsights} style={[s.chip, s.tall]} />
         </View>
       </View>
@@ -72,10 +74,10 @@ export const TableList = ({ mastery, settings, onPick, onSettings, onBack }: { m
   <Screen title="Pick a table" onBack={onBack}>
     <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 20 }}>
       <View style={s.grid}>
-        {range(1, 20).map(n => <Tile key={n} n={n} onPress={() => onPick(n)} badge={facts([n], settings.upTo).every(q => fact(mastery, q).l === 5) ? '👑' : undefined} />)}
+        {range(1, 20).map(n => <Tile key={n} n={n} onPress={() => onPick(n)} badge={settings.trophies.includes(n) ? '🏆' : undefined} />)}
       </View>
       <UpToPicker value={settings.upTo} onChange={upTo => onSettings({ upTo })} />
-      <T style={s.muted}>A crown means every fact in that table is a dragon.</T>
+      <T style={s.muted}>🏆 means you won that table's trophy.</T>
     </ScrollView>
   </Screen>
 );
@@ -121,7 +123,7 @@ export function Setup({ settings, onSettings, onStart, onBack }: { settings: Set
 
 const cheer = (pct: number) => pct >= 0.9 ? 'You are a superstar!' : pct >= 0.7 ? 'Awesome work!' : pct >= 0.4 ? 'Great practice!' : 'Keep going, you are learning!';
 
-export function Results({ summary: { results, points, best, stars }, onAgain, onHome }: { summary: GameSummary; onAgain: () => void; onHome: () => void }) {
+export function Results({ summary: { results, trophies, points, best, stars }, onAgain, onHome }: { summary: GameSummary; onAgain: () => void; onHome: () => void }) {
   useEffect(() => { sfx('fanfare'); setTimeout(() => say(best ? 'best' : 'done'), 900); }, []);
   const right = results.filter(r => r.correct);
   const avg = right.length ? right.reduce((t, r) => t + r.ms, 0) / right.length / 1000 : 0;
@@ -137,6 +139,12 @@ export function Results({ summary: { results, points, best, stars }, onAgain, on
           <Stat label="Points" value={`${points}`} />
           <Stat label="Speed" value={`${avg.toFixed(1)}s`} />
         </View>
+        {trophies.length > 0 && (
+          <View style={[s.panel, { backgroundColor: C.gold }]}>
+            <T bold style={s.label}>{trophies.length === 1 ? 'New trophy!' : `${trophies.length} new trophies!`}</T>
+            <View style={s.hatches}>{trophies.map(n => <Trophy key={n} n={n} earned size={56} />)}</View>
+          </View>
+        )}
         {ups.length > 0 && (
           <View style={s.panel}>
             <T bold style={s.label}>{ups.length === 1 ? '1 fact grew up!' : `${ups.length} facts grew up!`}</T>

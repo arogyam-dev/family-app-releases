@@ -38,6 +38,13 @@ Tunables are at the top of `src/logic.ts`.
 - 👑 on a table once every fact in it is a dragon.
 - A buddy on Home that grows with average mastery, and creatures that hatch on level-up.
 
+## Trophies
+
+- Each table (1–20) has a 🏆 trophy, won when every fact in it is a 🐉 Dragon, up to the chosen ×N. Trophies are kept once won.
+- Grand prizes: 👑 **Times Tables Champion** (trophies 1–12) and 🐉 **Legend of Tables** (all 20).
+- Unlocking one mid-game triggers a fanfare, a gold celebration screen and a voice announcement.
+- The Trophy Room shows progress on each trophy; tapping a locked one offers practice on just that table.
+
 ## Insights
 
 The Insights screen (from Home) shows:
