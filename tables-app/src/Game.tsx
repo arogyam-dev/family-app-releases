@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ExpoSpeechRecognitionModule as Speech, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { fact, facts, grade, key, Mastery, parseNumber, pick, points, Q, Settings, TIMEOUT_MS } from './logic';
 import type { GameSummary, Result } from './screens';
 import { pickOne, say, sfx, stopVoice } from './sound';
-import { C, Confetti, Keypad, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, T } from './ui';
+import { C, Confetti, F, Hatch, Keypad, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, Segment, T } from './ui';
 
 type Phase = 'speak' | 'ask' | 'right' | 'wrong';
 type Props = { settings: Settings; mastery: Mastery; onUpdate: (m: Mastery) => void; onSettings: (p: Partial<Settings>) => void; onDone: (s: GameSummary) => void; onBack: () => void };
 
 const PRAISE = ['Awesome! 🎉', 'Great job! 🌟', 'You got it! 🙌', 'Super star! ⭐', 'Amazing! 🤩', 'Well done! 👏', 'Brilliant! 💡', 'Woohoo! 🥳'];
 const COMBOS: Record<number, string> = { 3: 'combo3', 5: 'combo5', 10: 'combo10' };
-const NO_MIC = 'Use the keypad ⌨️ (no mic permission)';
+const NO_MIC = 'No microphone. Use the keypad.';
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export default function Game({ settings, mastery, onUpdate, onSettings, onDone, onBack }: Props) {
@@ -103,13 +103,13 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
   const fg = done ? '#fff' : C.ink;
   const lvl = fact(st.m, q).l;
   const num = st.results.length + (done ? 0 : 1);
-  const status = micError || { speak: '👂 Listen…', ask: '🎤 Say the answer!', right: praise, wrong: 'Nice try! 💪' }[phase];
+  const status = micError || { speak: 'Listen…', ask: keypad ? 'Say it or type it!' : 'Say the answer!', right: praise, wrong: 'Nice try!' }[phase];
 
   return (
-    <Screen title={`${num} / ${count}`} onBack={onBack} bg={phase === 'right' ? C.good : phase === 'wrong' ? C.bad : C.bg} right={
+    <Screen onBack={onBack} bg={phase === 'right' ? C.good : phase === 'wrong' ? C.bad : C.bg} right={
       <View style={s.headRight}>
-        <View style={s.pill}><T bold style={{ fontSize: 18 }}>⭐ {st.points}</T></View>
-        <Pressable onPress={() => onSettings({ keypad: !keypad })} style={s.pill} hitSlop={8}><T style={{ fontSize: 18 }}>{keypad ? '🎤' : '⌨️'}</T></Pressable>
+        <View style={s.pill}><T bold style={{ fontSize: F.small }}>⭐ {st.points}</T></View>
+        <Segment options={[['voice', 'Voice'], ['keypad', 'Keypad']]} value={keypad ? 'keypad' : 'voice'} onChange={k => onSettings({ keypad: k === 'keypad' })} />
       </View>
     }>
       <View style={s.bar}><View style={[s.barFill, { width: `${(num / count) * 100}%` }]} /></View>
@@ -121,25 +121,24 @@ export default function Game({ settings, mastery, onUpdate, onSettings, onDone, 
         <T bold style={[s.q, { color: fg }]} adjustsFontSizeToFit numberOfLines={1}>{q.a} × {q.b} = {phase === 'wrong' ? q.a * q.b : typed || '?'}</T>
         <T bold style={[s.status, { color: fg }]}>{status}</T>
         {!!heard && !keypad && <T style={[s.heard, { color: fg }]}>“{heard}”</T>}
-        {levelUp && <Pop style={s.levelUp}><T bold style={{ fontSize: 22 }}>Level up! {LEVEL_NAMES[levelUp[1] - 1]}</T></Pop>}
+        {levelUp && <View style={{ alignItems: 'center' }}><Hatch from={levelUp[0]} to={levelUp[1]} size={80} /><T bold style={[s.heard, { color: fg, opacity: 1 }]}>{q.a} × {q.b} grew into a {LEVEL_NAMES[levelUp[1] - 1].split(' ')[0]}!</T></View>}
       </View>
-      {keypad && <Keypad value={typed} onChange={v => !done && setTyped(v)} onSubmit={() => !done && answer(+typed === q.a * q.b)} />}
+      {keypad && <Keypad value={typed} onChange={setTyped} onSubmit={() => answer(+typed === q.a * q.b)} disabled={done} />}
       {phase === 'right' && <Confetti key={num} count={st.combo >= 5 ? 70 : 35} />}
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  headRight: { flexDirection: 'row', gap: 8 },
-  pill: { backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, elevation: 2 },
+  headRight: { flexDirection: 'row', gap: 8, alignItems: 'center', marginLeft: 'auto' },
+  pill: { backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   bar: { height: 12, borderRadius: 6, backgroundColor: '#0001', overflow: 'hidden' },
   barFill: { height: '100%', backgroundColor: C.gold, borderRadius: 6 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
   badges: { flexDirection: 'row', gap: 8 },
   badge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
-  badgeText: { color: '#fff', fontSize: 16 },
-  q: { fontSize: 72, textAlign: 'center' },
-  status: { fontSize: 30, textAlign: 'center' },
-  heard: { fontSize: 20, opacity: 0.7 },
-  levelUp: { backgroundColor: C.gold, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10 },
+  badgeText: { color: '#fff', fontSize: F.small },
+  q: { fontSize: F.display, textAlign: 'center' },
+  status: { fontSize: F.head, textAlign: 'center' },
+  heard: { fontSize: F.body, opacity: 0.7 },
 });

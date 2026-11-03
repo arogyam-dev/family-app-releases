@@ -50,7 +50,7 @@ export default function App() {
   const screen = () => {
     switch (route.name) {
       case 'splash': return <Splash onDone={home} />;
-      case 'home': return <Home settings={settings} onView={() => go({ name: 'tables' })} onPlay={() => go({ name: 'setup' })} onInsights={() => go({ name: 'insights' })} />;
+      case 'home': return <Home mastery={mastery} settings={settings} onView={() => go({ name: 'tables' })} onPlay={() => go({ name: 'setup' })} onInsights={() => go({ name: 'insights' })} />;
       case 'insights': return <Insights mastery={mastery} settings={settings} onBack={home} />;
       case 'tables': return <TableList mastery={mastery} settings={settings} onSettings={updateSettings} onPick={n => go({ name: 'table', n })} onBack={home} />;
       case 'table': return <TableView n={route.n} mastery={mastery} upTo={settings.upTo} onBack={() => go({ name: 'tables' })} />;

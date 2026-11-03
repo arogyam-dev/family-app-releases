@@ -36,6 +36,7 @@ Tunables are at the top of `src/logic.ts`.
 - A level-up chime when a fact levels up.
 - 1–3 stars per game, a lifetime star count, and a high score 🏆.
 - 👑 on a table once every fact in it is a dragon.
+- A buddy on Home that grows with average mastery, and creatures that hatch on level-up.
 
 ## Insights
 

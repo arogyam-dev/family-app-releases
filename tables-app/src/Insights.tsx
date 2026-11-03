@@ -1,8 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { fact, facts, fastMs, Mastery, Q, range, Settings } from './logic';
-import { emoji } from './screens';
-import { C, LEVEL_NAMES, Screen, T } from './ui';
+import { C, creature as emoji, F, LEVEL_NAMES, Screen, T } from './ui';
 
 /** Sequential ramp (one hue, light → dark) for mastery level 1..5. */
 const RAMP = ['#E4DEFB', '#BDB2F3', '#9585EA', '#6C5CE7', '#3B2BA8'];
@@ -19,7 +18,7 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
 
   if (!seen.length) return (
     <Screen title="Insights" onBack={onBack}>
-      <View style={s.empty}><T style={{ fontSize: 80 }}>📊</T><T bold style={s.h2}>Play a game to see insights!</T></View>
+      <View style={s.empty}><T style={{ fontSize: 96 }}>🥚</T><T bold style={s.h2}>Play a game to see insights.</T></View>
     </Screen>
   );
 
@@ -43,7 +42,7 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
     <Screen title="Insights" onBack={onBack}>
       <ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 24 }}>
         <View style={s.tiles}>
-          <Tile value={`${counts[4]}/${scope.length}`} label="Mastered 🐉" />
+          <Tile value={`${counts[4]}/${scope.length}`} label="Dragons 🐉" />
           <Tile value={`${Math.round((corrects / tries) * 100)}%`} label="Accuracy" />
           <Tile value={`${corrects ? (totalMs / corrects / 1000).toFixed(1) : '–'}s`} label="Avg speed" />
           <Tile value={`${history.length}`} label="Games" />
@@ -73,10 +72,10 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
           <T style={[s.small, { color: C.muted, marginTop: 6 }]}>Rows are tables, columns × 1 to × {upTo}. Outlined = not tried. Darker = stronger.</T>
         </Card>
 
-        {strong.length > 0 && <Card title="Super strong 💪">{strong.map(t => <Line key={t.a} left={`Table of ${t.a}`} right={emoji(Math.round(t.lvl))} />)}</Card>}
-        {weak.length > 0 && <Card title="Needs practice 🎯">{weak.map(t => <Line key={t.a} left={`Table of ${t.a}`} right={emoji(Math.round(t.lvl))} />)}</Card>}
-        {tricky.length > 0 && <Card title="Tricky facts 🤔">{tricky.map(q => <Line key={label(q)} left={`${label(q)} = ${q.a * q.b}`} right={`missed ${f(q).w} of ${f(q).n}`} />)}</Card>}
-        {slow.length > 0 && <Card title="Needs more speed 🐢">{slow.map(q => <Line key={label(q)} left={`${label(q)} = ${q.a * q.b}`} right={`${(avgMs(q) / 1000).toFixed(1)}s`} />)}</Card>}
+        {strong.length > 0 && <Card title="Strongest tables">{strong.map(t => <Line key={t.a} left={`Table of ${t.a}`} right={emoji(Math.round(t.lvl))} />)}</Card>}
+        {weak.length > 0 && <Card title="Needs practice">{weak.map(t => <Line key={t.a} left={`Table of ${t.a}`} right={emoji(Math.round(t.lvl))} />)}</Card>}
+        {tricky.length > 0 && <Card title="Most missed">{tricky.map(q => <Line key={label(q)} left={`${label(q)} = ${q.a * q.b}`} right={`missed ${f(q).w} of ${f(q).n}`} />)}</Card>}
+        {slow.length > 0 && <Card title="Slowest answers">{slow.map(q => <Line key={label(q)} left={`${label(q)} = ${q.a * q.b}`} right={`${(avgMs(q) / 1000).toFixed(1)}s`} />)}</Card>}
 
         {recent.length > 0 && (
           <Card title="Recent games (% correct)">
@@ -100,31 +99,31 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
 }
 
 const Tile = ({ value, label }: { value: string; label: string }) => (
-  <View style={s.tile}><T bold style={{ fontSize: 24, color: C.ink }}>{value}</T><T style={[s.small, { color: C.muted }]}>{label}</T></View>
+  <View style={s.tile}><T bold style={{ fontSize: F.head }}>{value}</T><T style={[s.small, { color: C.muted }]}>{label}</T></View>
 );
 const Card = ({ title, children }: { title: string; children: ReactNode }) => (
   <View style={s.card}><T bold style={s.h2}>{title}</T>{children}</View>
 );
 const Line = ({ left, right }: { left: string; right: string }) => (
-  <View style={s.line}><T style={{ fontSize: 18 }}>{left}</T><T style={{ fontSize: 18, color: C.muted }}>{right}</T></View>
+  <View style={s.line}><T style={{ fontSize: F.body }}>{left}</T><T style={{ fontSize: F.body, color: C.muted }}>{right}</T></View>
 );
 
 const s = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  h2: { fontSize: 20, marginBottom: 8 },
-  small: { fontSize: 14 },
+  h2: { fontSize: F.body, marginBottom: 8 },
+  small: { fontSize: F.small },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '48%', flexGrow: 1, backgroundColor: C.card, borderRadius: 18, padding: 14, elevation: 1 },
-  card: { backgroundColor: C.card, borderRadius: 18, padding: 14, elevation: 1 },
+  tile: { width: '48%', flexGrow: 1, backgroundColor: C.card, borderRadius: 18, padding: 14 },
+  card: { backgroundColor: C.card, borderRadius: 18, padding: 14 },
   stack: { flexDirection: 'row', height: 24, borderRadius: 6, overflow: 'hidden', gap: 2 },
   legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   swatch: { width: 12, height: 12, borderRadius: 3 },
   heatRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
-  heatLabel: { width: 24, fontSize: 13, color: C.muted, textAlign: 'right', marginRight: 4 },
+  heatLabel: { width: 24, fontSize: F.small, color: C.muted, textAlign: 'right', marginRight: 4 },
   cell: { flex: 1, aspectRatio: 1, borderRadius: 3, maxWidth: 28 },
   untried: { borderWidth: 1.5, borderColor: '#D9D5E6' },
-  tip: { backgroundColor: C.card, borderRadius: 14, padding: 12, marginTop: 8, elevation: 4 },
+  tip: { backgroundColor: C.card, borderRadius: 14, padding: 12, marginTop: 8, borderWidth: 1, borderColor: C.line },
   line: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderColor: '#F1EFF6' },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 6, borderBottomWidth: 1, borderColor: '#E5E3EE' },
   barCol: { flex: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' },

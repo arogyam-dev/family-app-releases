@@ -4,9 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { sfx } from './sound';
 
-export const C = { bg: '#FFF6E5', ink: '#2B2D42', primary: '#6C5CE7', good: '#00B894', bad: '#FF6B6B', muted: '#A29BBF', card: '#FFFFFF', gold: '#FDCB6E' };
+export const C = { bg: '#FFF6E5', ink: '#2B2D42', primary: '#6C5CE7', good: '#00B894', bad: '#FF6B6B', muted: '#6B6880', card: '#FFFFFF', gold: '#FDCB6E', line: '#0000000F' };
+/** The five type sizes used in the app. */
+export const F = { display: 72, title: 40, head: 26, body: 20, small: 15 };
 export const LEVEL_COLORS = ['#FF6B6B', '#FF9F43', '#FECA57', '#7BED9F', '#00B894'];
 export const LEVEL_NAMES = ['Egg 🥚', 'Chick 🐣', 'Bird 🐦', 'Eagle 🦅', 'Dragon 🐉'];
+export const creature = (l: number) => LEVEL_NAMES[l - 1].split(' ')[1];
 
 /** Text in the app's rounded font. */
 export const T = ({ style, bold, ...p }: TextProps & { bold?: boolean }) => (
@@ -15,17 +18,29 @@ export const T = ({ style, bold, ...p }: TextProps & { bold?: boolean }) => (
 
 const press = () => { sfx('tap'); Haptics.selectionAsync().catch(() => {}); };
 
-export const Btn = ({ title, onPress, color = C.primary, style, small }: { title: string; onPress: () => void; color?: string; style?: ViewStyle; small?: boolean }) => (
-  <Pressable onPress={() => { press(); onPress(); }} style={({ pressed }) => [s.btn, small && s.btnSmall, { backgroundColor: color, transform: [{ scale: pressed ? 0.95 : 1 }] }, style]}>
-    <T bold style={[s.btnText, small && { fontSize: 18 }]}>{title}</T>
+/** Chunky pressable button; `soft` is the quiet white variant for secondary actions and unselected chips. */
+export const Btn = ({ title, onPress, color = C.primary, soft, small, style }: { title: string; onPress: () => void; color?: string; soft?: boolean; small?: boolean; style?: StyleProp<ViewStyle> }) => (
+  <Pressable onPress={() => { press(); onPress(); }} style={({ pressed }) => [s.btn, small && s.btnSmall, { backgroundColor: soft ? C.card : color, transform: [{ scale: pressed ? 0.95 : 1 }] }, style]}>
+    <T bold style={[s.btnText, small && { fontSize: F.body }, soft && { color: C.ink }]}>{title}</T>
   </Pressable>
+);
+
+/** Two-way switch, e.g. Voice | Keypad. */
+export const Segment = <K extends string>({ options, value, onChange }: { options: [K, string][]; value: K; onChange: (k: K) => void }) => (
+  <View style={s.segment}>
+    {options.map(([k, label]) => (
+      <Pressable key={k} onPress={() => { press(); onChange(k); }} style={[s.segItem, value === k && { backgroundColor: C.ink }]} hitSlop={4}>
+        <T bold style={{ fontSize: F.small, color: value === k ? '#fff' : C.ink }}>{label}</T>
+      </Pressable>
+    ))}
+  </View>
 );
 
 export const Screen = ({ title, onBack, right, children, bg = C.bg }: { title?: string; onBack?: () => void; right?: ReactNode; children: ReactNode; bg?: string }) => (
   <SafeAreaView style={[s.screen, { backgroundColor: bg }]}>
     {(title || onBack) && (
       <View style={s.header}>
-        {onBack && <Pressable onPress={onBack} hitSlop={16} style={s.back}><T bold style={{ fontSize: 22, color: C.primary }}>‹</T></Pressable>}
+        {onBack && <Pressable onPress={onBack} hitSlop={16} style={s.back}><T bold style={{ fontSize: F.head, color: C.ink, marginTop: -3 }}>‹</T></Pressable>}
         <T bold style={s.title}>{title}</T>
         {right}
       </View>
@@ -43,14 +58,14 @@ export const Tile = ({ n, on = true, badge, onPress }: { n: number; on?: boolean
 );
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
-export const Keypad = ({ value, onChange, onSubmit }: { value: string; onChange: (v: string) => void; onSubmit: () => void }) => (
-  <View style={s.keypad}>
+export const Keypad = ({ value, onChange, onSubmit, disabled }: { value: string; onChange: (v: string) => void; onSubmit: () => void; disabled?: boolean }) => (
+  <View style={[s.keypad, disabled && { opacity: 0.4 }]} pointerEvents={disabled ? 'none' : 'auto'}>
     {KEYS.map(k => (
       <Pressable key={k} onPress={() => {
         press();
         if (k === '✓') value && onSubmit();
         else onChange(k === '⌫' ? value.slice(0, -1) : (value + k).slice(0, 3));
-      }} style={({ pressed }) => [s.key, k === '✓' && { backgroundColor: C.good }, { opacity: pressed ? 0.7 : 1 }]}>
+      }} style={({ pressed }) => [s.key, k === '✓' && { backgroundColor: C.ink }, { opacity: pressed ? 0.7 : 1 }]}>
         <T bold style={[s.keyText, k === '✓' && { color: '#fff' }]}>{k}</T>
       </Pressable>
     ))}
@@ -84,6 +99,21 @@ export function Confetti({ count = 40 }: { count?: number }) {
   );
 }
 
+/** The old creature shrinks away and the new one springs in. */
+export function Hatch({ from, to, size = 96 }: { from: number; to: number; size?: number }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => { Animated.spring(v, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }).start(); }, []);
+  const out = v.interpolate({ inputRange: [0, 0.4], outputRange: [1, 0], extrapolate: 'clamp' });
+  const inn = v.interpolate({ inputRange: [0.3, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+  const wobble = v.interpolate({ inputRange: [0, 0.1, 0.2, 0.3, 1], outputRange: ['0deg', '-15deg', '15deg', '0deg', '0deg'] });
+  return (
+    <View style={{ width: size * 1.2, height: size * 1.2, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.Text style={{ position: 'absolute', fontSize: size, opacity: out, transform: [{ scale: out }, { rotate: wobble }] }}>{creature(from)}</Animated.Text>
+      <Animated.Text style={{ position: 'absolute', fontSize: size, transform: [{ scale: inn }] }}>{creature(to)}</Animated.Text>
+    </View>
+  );
+}
+
 /** Springs in from small on mount. */
 export function Pop({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const v = useRef(new Animated.Value(0)).current;
@@ -94,15 +124,17 @@ export function Pop({ children, style }: { children: ReactNode; style?: StylePro
 const s = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: 16, paddingBottom: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  back: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', elevation: 2 },
-  title: { fontSize: 26, flex: 1 },
-  btn: { paddingVertical: 18, paddingHorizontal: 24, borderRadius: 24, alignItems: 'center', elevation: 3, borderBottomWidth: 5, borderColor: '#0002' },
+  back: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: F.head, flex: 1 },
+  btn: { paddingVertical: 18, paddingHorizontal: 24, borderRadius: 24, alignItems: 'center', borderBottomWidth: 5, borderColor: '#0000001F' },
   btnSmall: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, borderBottomWidth: 3 },
-  btnText: { color: '#fff', fontSize: 24 },
-  tile: { width: '22%', aspectRatio: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', elevation: 3 },
-  tileText: { fontSize: 28 },
-  tileBadge: { position: 'absolute', top: -6, right: -4, fontSize: 20 },
+  btnText: { color: '#fff', fontSize: F.head },
+  tile: { width: '22%', aspectRatio: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 4, borderColor: '#0000001A' },
+  tileText: { fontSize: F.head },
+  tileBadge: { position: 'absolute', top: -6, right: -4, fontSize: F.body },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  key: { width: '30%', height: 56, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', elevation: 2 },
-  keyText: { fontSize: 28 },
+  key: { width: '30%', height: 56, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderColor: '#0000001A' },
+  keyText: { fontSize: F.head },
+  segment: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 999, padding: 3 },
+  segItem: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
 });
