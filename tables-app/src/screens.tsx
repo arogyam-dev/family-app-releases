@@ -3,7 +3,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { fact, facts, Mastery, Q, range, Settings, UP_TO_OPTIONS } from './logic';
 import { say, sfx } from './sound';
 import { Trophy } from './Trophies';
-import { aName, Btn, C, Confetti, creature, F, Hatch, Pop, Screen, T, Tile } from './ui';
+import { aName, Btn, C, Confetti, creature, F, Hatch, Pop, Screen, Stat, T, Tile } from './ui';
 
 export type Result = { q: Q; correct: boolean; ms: number; from: number; to: number };
 export type GameSummary = { results: Result[]; trophies: number[]; points: number; best: boolean; stars: number };
@@ -183,10 +183,6 @@ export function Results({ summary: { results, trophies, points, best, stars }, o
   );
 }
 
-const Stat = ({ label, value }: { label: string; value: string }) => (
-  <View style={s.statBox}><T bold style={{ fontSize: F.head, color: C.primary }}>{value}</T><T style={s.statLabel}>{label}</T></View>
-);
-
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   splash: { fontSize: F.title, color: '#fff', textAlign: 'center' },
@@ -209,8 +205,6 @@ const s = StyleSheet.create({
   cheer: { fontSize: F.head, textAlign: 'center', color: C.ink },
   bestBox: { alignSelf: 'center', backgroundColor: C.gold, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 8 },
   statRow: { flexDirection: 'row', gap: 10 },
-  statBox: { flex: 1, backgroundColor: C.card, borderRadius: 18, padding: 12, alignItems: 'center' },
-  statLabel: { fontSize: F.small, color: C.muted },
   panel: { backgroundColor: C.card, borderRadius: 18, padding: 14, gap: 10 },
   hatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   facts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

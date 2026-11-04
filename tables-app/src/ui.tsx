@@ -51,6 +51,11 @@ export const Screen = ({ title, onBack, right, children, bg = C.bg }: { title?: 
   </SafeAreaView>
 );
 
+/** A number with a label under it, on a card. */
+export const Stat = ({ value, label, style }: { value: string; label: string; style?: StyleProp<ViewStyle> }) => (
+  <View style={[s.stat, style]}><T bold style={{ fontSize: F.head, color: C.primary }}>{value}</T><T style={{ fontSize: F.small, color: C.muted }}>{label}</T></View>
+);
+
 /** Square tile for picking a table number. */
 export const Tile = ({ n, on = true, badge, onPress }: { n: number; on?: boolean; badge?: string; onPress: () => void }) => (
   <Pressable onPress={() => { press(); onPress(); }} style={({ pressed }) => [s.tile, { backgroundColor: on ? C.primary : C.card, transform: [{ scale: pressed ? 0.92 : 1 }] }]}>
@@ -134,6 +139,7 @@ const s = StyleSheet.create({
   tile: { width: '22%', aspectRatio: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 4, borderColor: '#0000001A' },
   tileText: { fontSize: F.head },
   tileBadge: { position: 'absolute', top: -6, right: -4, fontSize: F.body },
+  stat: { flex: 1, backgroundColor: C.card, borderRadius: 18, padding: 12, alignItems: 'center' },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   key: { width: '30%', height: 56, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderColor: '#0000001A' },
   keyText: { fontSize: F.head },

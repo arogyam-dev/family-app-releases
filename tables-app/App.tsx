@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import { Fredoka_500Medium, Fredoka_700Bold, useFonts } from '@expo-google-fonts
 import Game from './src/Game';
 import Insights from './src/Insights';
 import Trophies from './src/Trophies';
-import { DEFAULT_SETTINGS, loadMastery, loadSettings, Mastery, saveMastery, saveSettings, Settings } from './src/logic';
+import { DEFAULT_SETTINGS, loadMastery, loadSettings, Mastery, saveMastery, saveSettings, Settings, unlocks } from './src/logic';
 import { GameSummary, Home, Results, Setup, Splash, TableList, TableView } from './src/screens';
 
 type Route =
@@ -24,10 +24,19 @@ export default function App() {
   const [mastery, setMastery] = useState<Mastery>({});
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
+  const loaded = useRef(false); // never save before saved data has loaded, or we'd overwrite it
+
   useEffect(() => {
-    loadMastery().then(setMastery).catch(() => {});
-    loadSettings().then(setSettings).catch(() => {});
+    Promise.all([loadMastery(), loadSettings()])
+      .then(([m, s]) => { setMastery(m); setSettings(s); loaded.current = true; })
+      .catch(() => {});
   }, []);
+  // Award trophies already earned, e.g. after "up to" is lowered.
+  useEffect(() => {
+    if (!loaded.current) return;
+    const { fresh, all } = unlocks(mastery, settings.upTo, settings.trophies);
+    if (fresh.length) updateSettings({ trophies: all });
+  }, [settings.upTo, loaded.current]);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const p = parent(route);
@@ -37,13 +46,13 @@ export default function App() {
     return () => sub.remove();
   }, [route]);
 
-  const updateMastery = (m: Mastery) => { setMastery(m); saveMastery(m); };
-  const updateSettings = (p: Partial<Settings>) => setSettings(s => { const n = { ...s, ...p }; saveSettings(n); return n; });
+  const updateMastery = (m: Mastery) => { setMastery(m); if (loaded.current) saveMastery(m); };
+  const updateSettings = (p: Partial<Settings>) => setSettings(s => { const n = { ...s, ...p }; if (loaded.current) saveSettings(n); return n; });
   const play = (tables?: number[]) => go({ name: 'game', id: Date.now(), tables });
   const home = () => go({ name: 'home' });
   const finish = (summary: GameSummary, tables?: number[]) => {
     const log = { at: Date.now(), correct: summary.results.filter(r => r.correct).length, total: summary.results.length, points: summary.points };
-    updateSettings({ stars: settings.stars + summary.stars, history: [...settings.history, log].slice(-50), games: Math.max(settings.games, settings.history.length) + 1, ...(summary.best && { best: summary.points }) });
+    updateSettings({ stars: settings.stars + summary.stars, history: [...settings.history, log].slice(-50), games: settings.games + 1, ...(summary.best && { best: summary.points }) });
     go({ name: 'results', summary, tables });
   };
 

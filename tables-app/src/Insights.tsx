@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { fact, facts, fastMs, Mastery, Q, range, Settings } from './logic';
-import { C, creature as emoji, F, LEVEL_NAMES, Screen, T } from './ui';
+import { C, creature as emoji, F, LEVEL_NAMES, Screen, Stat, T } from './ui';
 
 /** Sequential ramp (one hue, light → dark) for mastery level 1..5. */
 const RAMP = ['#E4DEFB', '#BDB2F3', '#9585EA', '#6C5CE7', '#3B2BA8'];
@@ -11,7 +11,8 @@ const label = (q: Q) => `${q.a} × ${q.b}`;
 export default function Insights({ mastery, settings, onBack }: { mastery: Mastery; settings: Settings; onBack: () => void }) {
   const [tip, setTip] = useState('Tap a square or bar for details');
   const { upTo, history } = settings;
-  const seen = facts(range(1, 20), upTo).filter(q => fact(mastery, q).n);
+  // Every fact ever practised, whatever the current "up to" setting.
+  const seen = Object.keys(mastery).map(k => { const [a, b] = k.split('x').map(Number); return { a, b }; }).filter(q => fact(mastery, q).n);
   const tables = [...new Set([...settings.tables, ...seen.map(q => q.a)])].sort((a, b) => a - b);
   const scope = facts(tables, upTo);
   const f = (q: Q) => fact(mastery, q);
@@ -29,9 +30,10 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
   const byScore = [...tableScore].sort((x, y) => y.lvl - x.lvl);
   const strong = byScore.slice(0, 3).filter(t => t.lvl > 1);
   const weak = byScore.slice(-3).reverse().filter(t => !strong.includes(t));
-  const tricky = seen.filter(q => f(q).w).sort((x, y) => f(y).w! / f(y).n! - f(x).w! / f(x).n! || f(y).w! - f(x).w!).slice(0, 5);
   const avgMs = (q: Q) => f(q).t! / (f(q).n! - (f(q).w ?? 0));
-  const slow = seen.filter(q => f(q).n! > (f(q).w ?? 0) && avgMs(q) > fastMs(q)).sort((x, y) => avgMs(y) - avgMs(x)).slice(0, 5);
+  const by = <K,>(xs: Q[], score: (q: Q) => K) => xs.map(q => ({ q, k: score(q) }));
+  const tricky = by(seen.filter(q => f(q).w), q => f(q).w! / f(q).n! + f(q).w! / 1000).sort((x, y) => y.k - x.k).slice(0, 5).map(x => x.q);
+  const slow = by(seen.filter(q => f(q).n! > (f(q).w ?? 0)), avgMs).filter(x => x.k > fastMs(x.q)).sort((x, y) => y.k - x.k).slice(0, 5).map(x => x.q);
   const recent = history.slice(-10);
   const factTip = (q: Q) => {
     const x = f(q);
@@ -42,12 +44,8 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
     <Screen title="Insights" onBack={onBack}>
       <ScrollView contentContainerStyle={{ gap: 14, paddingBottom: 24 }}>
         <View style={s.tiles}>
-          <Tile value={`${counts[4]}/${scope.length}`} label="Dragons 🐉" />
-          <Tile value={`${Math.round((corrects / tries) * 100)}%`} label="Accuracy" />
-          <Tile value={`${corrects ? (totalMs / corrects / 1000).toFixed(1) : '–'}s`} label="Avg speed" />
-          <Tile value={`${Math.max(settings.games, history.length)}`} label="Games" />
-          <Tile value={`${settings.trophies.length}/20`} label="Trophies 🏆" />
-          <Tile value={`${settings.best}`} label="Best score" />
+          {([[`${counts[4]}/${scope.length}`, 'Dragons 🐉'], [`${Math.round((corrects / tries) * 100)}%`, 'Accuracy'], [`${corrects ? (totalMs / corrects / 1000).toFixed(1) : '–'}s`, 'Avg speed'],
+            [`${settings.games}`, 'Games'], [`${settings.trophies.length}/20`, 'Trophies 🏆'], [`${settings.best}`, 'Best score']] as const).map(([v, l]) => <Stat key={l} value={v} label={l} style={s.tile} />)}
         </View>
 
         <Card title="Mastery">
@@ -65,10 +63,10 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
           {tables.map(a => (
             <View key={a} style={s.heatRow}>
               <T bold style={s.heatLabel}>{a}</T>
-              {range(1, upTo).map(b => (
-                <Pressable key={b} onPress={() => setTip(factTip({ a, b }))} hitSlop={2}
-                  style={[s.cell, f({ a, b }).n ? { backgroundColor: RAMP[f({ a, b }).l - 1] } : s.untried]} />
-              ))}
+              {range(1, upTo).map(b => {
+                const x = f({ a, b });
+                return <Pressable key={b} onPress={() => setTip(factTip({ a, b }))} hitSlop={2} style={[s.cell, x.n ? { backgroundColor: RAMP[x.l - 1] } : s.untried]} />;
+              })}
             </View>
           ))}
           <T style={[s.small, { color: C.muted, marginTop: 6 }]}>Rows are tables, columns × 1 to × {upTo}. Outlined = not tried. Darker = stronger.</T>
@@ -100,9 +98,6 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
   );
 }
 
-const Tile = ({ value, label }: { value: string; label: string }) => (
-  <View style={s.tile}><T bold style={{ fontSize: F.head }}>{value}</T><T style={[s.small, { color: C.muted }]}>{label}</T></View>
-);
 const Card = ({ title, children }: { title: string; children: ReactNode }) => (
   <View style={s.card}><T bold style={s.h2}>{title}</T>{children}</View>
 );
@@ -115,7 +110,7 @@ const s = StyleSheet.create({
   h2: { fontSize: F.body, marginBottom: 8 },
   small: { fontSize: F.small },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '48%', flexGrow: 1, backgroundColor: C.card, borderRadius: 18, padding: 14 },
+  tile: { flexBasis: '30%', flexGrow: 1 },
   card: { backgroundColor: C.card, borderRadius: 18, padding: 14 },
   stack: { flexDirection: 'row', height: 24, borderRadius: 6, overflow: 'hidden', gap: 2 },
   legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },

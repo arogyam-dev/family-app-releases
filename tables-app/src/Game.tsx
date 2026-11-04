@@ -14,7 +14,7 @@ type Props = { settings: Settings; tables?: number[]; mastery: Mastery; onUpdate
 const PRAISE = ['Awesome! 🎉', 'Great job! 🌟', 'You got it! 🙌', 'Super star! ⭐', 'Amazing! 🤩', 'Well done! 👏', 'Brilliant! 💡', 'Woohoo! 🥳'];
 const COMBOS: Record<number, string> = { 3: 'combo3', 5: 'combo5', 10: 'combo10' };
 const NO_MIC = 'No microphone. Use the keypad.';
-const FATAL = ['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'];
+const FATAL = ['not-allowed', 'service-not-allowed', 'language-not-supported']; // others (e.g. mic busy) are retried with a pause
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 /** A partial transcript of these targets may still grow into a different number ("thirty" → "thirty six"). */
 const mayGrow = (n: number) => n < 10 || n % 10 === 0;
@@ -30,7 +30,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
   const [levelUp, setLevelUp] = useState<[number, number] | null>(null);
   const [micError, setMicError] = useState('');
   const [unlock, setUnlock] = useState<{ tables: number[]; grands: Grand[] } | null>(null);
-  const [st] = useState(() => ({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), tHeard: 0, micOk: true, alive: true, combo: 0, points: 0, results: [] as Result[], trophies: settings.trophies, won: [] as number[], retry: [] as { q: Q; at: number }[] }));
+  const [st] = useState(() => ({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), tHeard: 0, micOk: true, backoff: 0, alive: true, combo: 0, points: 0, results: [] as Result[], trophies: settings.trophies, won: [] as number[], retry: [] as { q: Q; at: number }[] }));
   const go = (p: Phase) => { st.phase = p; setPhase(p); };
 
   const listen = () => Speech.start({ lang: 'en-US', interimResults: true, continuous: false, maxAlternatives: 3 });
@@ -101,14 +101,24 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
     const target = st.q.a * st.q.b, top = parseNumber(texts[0] ?? '');
     if (!e.isFinal) {
       // Accept a correct partial right away, unless the child may still be mid-number; then keep the time it was heard.
-      if (top === target) mayGrow(target) ? (st.tHeard ||= Date.now()) : answer(true);
+      if (top !== target) st.tHeard = 0;
+      else if (mayGrow(target)) st.tHeard ||= Date.now();
+      else answer(true);
       return;
     }
     const said = top ?? texts.map(parseNumber).find(n => n !== null) ?? null; // alternatives only if the top result has no number
-    if (said !== null) answer(said === target);
+    if (said === null) st.tHeard = 0;
+    else answer(said === target);
   });
-  useSpeechRecognitionEvent('end', () => { if (st.phase === 'ask' && st.micOk) setTimeout(() => st.phase === 'ask' && listen(), 150); });
-  useSpeechRecognitionEvent('error', e => { if (FATAL.includes(e.error)) noMic(); });
+  useSpeechRecognitionEvent('end', () => {
+    if (st.phase === 'ask' && st.micOk) setTimeout(() => st.phase === 'ask' && st.micOk && listen(), st.backoff || 150);
+    st.backoff = 0;
+  });
+  useSpeechRecognitionEvent('error', e => { if (FATAL.includes(e.error)) noMic(); else if (e.error !== 'no-speech' && e.error !== 'aborted') st.backoff = 2000; });
+  const useVoice = () => {
+    st.micOk = true; setMicError(''); onSettings({ keypad: false });
+    Speech.requestPermissionsAsync().then(p => { if (!p.granted) noMic(); else if (st.phase === 'ask') listen(); }, noMic);
+  };
   const noMic = () => { st.micOk = false; setMicError(NO_MIC); onSettings({ keypad: true }); };
 
   useEffect(() => {
@@ -134,7 +144,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
     <Screen onBack={onBack} bg={phase === 'right' ? C.good : phase === 'wrong' ? C.bad : C.bg} right={
       <View style={s.headRight}>
         <View style={s.pill}><T bold style={{ fontSize: F.small }}>⭐ {st.points}</T></View>
-        <Segment options={[['voice', 'Voice'], ['keypad', 'Keypad']]} value={keypad ? 'keypad' : 'voice'} onChange={k => onSettings({ keypad: k === 'keypad' })} />
+        <Segment options={[['voice', 'Voice'], ['keypad', 'Keypad']]} value={keypad ? 'keypad' : 'voice'} onChange={k => (k === 'voice' ? useVoice() : onSettings({ keypad: true }))} />
       </View>
     }>
       <View style={s.bar}><View style={[s.barFill, { width: `${(num / count) * 100}%` }]} /></View>

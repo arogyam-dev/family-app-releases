@@ -20,11 +20,16 @@ export const facts = (tables: number[], upTo: number): Q[] => tables.flatMap(a =
 /** Time allowed for a "fast" answer: 3s up to 10×10, 5s when one side is over 10, 6s when both are. */
 export const fastMs = ({ a, b }: Q) => [3000, 5000, 6000][+(a > 10) + +(b > 10)];
 
-const load = async <T,>(k: string, d: T): Promise<T> => ({ ...d, ...JSON.parse((await AsyncStorage.getItem(k)) ?? '{}') });
+/** Storage read errors propagate (so callers don't overwrite real data); a corrupt value is kept aside and defaults used. */
+async function load<T>(k: string, d: T): Promise<T> {
+  const raw = await AsyncStorage.getItem(k);
+  try { return { ...d, ...JSON.parse(raw ?? '{}') }; }
+  catch { await AsyncStorage.setItem(`${k}.corrupt`, raw ?? ''); return d; }
+}
 const save = (k: string) => (v: object) => AsyncStorage.setItem(k, JSON.stringify(v)).catch(() => {});
 export const loadMastery = () => load<Mastery>('mastery', {});
 export const saveMastery = save('mastery');
-export const loadSettings = () => load('settings', DEFAULT_SETTINGS);
+export const loadSettings = () => load('settings', DEFAULT_SETTINGS).then(s => ({ ...s, games: Math.max(s.games, s.history.length) }));
 export const saveSettings = save('settings');
 
 /** Fast correct builds a streak (longer streaks needed at lower levels); slow correct resets it; wrong drops a level. */
@@ -73,24 +78,27 @@ const ONES: Record<string, number> = {
 };
 const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fourty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 
-/** Last number spoken in a transcript, e.g. "7 times 8 is fifty six" → 56. */
+const WEAK = new Set(['oh', 'won', 'to', 'too', 'for', 'ate', 'tree']); // number-like everyday words
+
+/** Last number spoken in a transcript, e.g. "7 times 8 is fifty six" → 56. Lone everyday words ("for sure") count only if nothing else does. */
 export function parseNumber(text: string): number | null {
-  const nums: number[] = [];
-  let cur: number | null = null;
-  const flush = () => { if (cur !== null) nums.push(cur); cur = null; };
+  const nums: { n: number; weak: boolean }[] = [];
+  let cur: number | null = null, weak = false;
+  const flush = () => { if (cur !== null) nums.push({ n: cur, weak }); cur = null; weak = false; };
   for (const w of text.toLowerCase().replace(/-/g, ' ').split(/[^a-z0-9]+/).filter(Boolean)) {
-    if (/^\d+$/.test(w)) { flush(); nums.push(+w); }
-    else if (w === 'hundred') cur = (cur || 1) * 100;
+    if (/^\d+$/.test(w)) { flush(); nums.push({ n: +w, weak: false }); }
+    else if (w === 'hundred') { cur = (cur || 1) * 100; weak = false; }
     else if (w === 'and' && cur !== null) continue;
     else if (w in TENS || w in ONES) {
-      const v = TENS[w] ?? ONES[w];
-      const r = (cur ?? 0) % 100;
-      const joins = cur !== null && (cur >= 100 && r === 0 || r >= 20 && r % 10 === 0 && v < 10);
-      if (!joins) flush();
+      const v = TENS[w] ?? ONES[w], r = (cur ?? 0) % 100;
+      if (cur !== null && cur >= 1 && cur <= 4 && !weak && w in TENS) cur *= 100; // "one twenty" = 120
+      else if (!(cur !== null && (cur >= 100 && r === 0 || r >= 20 && r % 10 === 0 && v < 10))) flush();
+      weak = cur === null && WEAK.has(w);
       cur = (cur ?? 0) + v;
     }
     else flush();
   }
   flush();
-  return nums.length ? nums[nums.length - 1] : null;
+  const strong = nums.filter(x => !x.weak), pick = strong.length ? strong : nums;
+  return pick.length ? pick[pick.length - 1].n : null;
 }
