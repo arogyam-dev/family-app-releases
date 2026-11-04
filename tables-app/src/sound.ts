@@ -35,8 +35,7 @@ export function stopVoice() { voice.pause(); finish(); }
 
 export function sfx(name: Sfx) {
   const p = fx[name];
-  p.seekTo(0).catch(() => {});
-  p.play();
+  p.seekTo(0).then(() => p.play(), () => p.play());
 }
 
 export const pickOne = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];

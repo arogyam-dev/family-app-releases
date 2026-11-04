@@ -10,8 +10,8 @@ export type Fact = { l: number; s: number; n?: number; w?: number; t?: number };
 export type Mastery = Record<string, Fact>;
 export type Q = { a: number; b: number };
 export type GameLog = { at: number; correct: number; total: number; points: number };
-export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number; history: GameLog[]; trophies: number[] };
-export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0, history: [], trophies: [] };
+export type Settings = { tables: number[]; count: number; upTo: number; keypad: boolean; best: number; stars: number; history: GameLog[]; games: number; trophies: number[] };
+export const DEFAULT_SETTINGS: Settings = { tables: range(1, 12), count: 25, upTo: 10, keypad: false, best: 0, stars: 0, history: [], games: 0, trophies: [] };
 
 export function range(a: number, b: number) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
 export const key = ({ a, b }: Q) => `${a}x${b}`;

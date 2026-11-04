@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ExpoSpeechRecognitionModule as Speech, useSpeechRecognitionEvent } from 'expo-speech-recognition';
@@ -6,7 +6,7 @@ import { fact, facts, grade, Grand, key, Mastery, parseNumber, pick, points, Q, 
 import type { GameSummary, Result } from './screens';
 import { pickOne, say, sfx, stopVoice } from './sound';
 import { TrophyUnlock } from './Trophies';
-import { C, Confetti, F, Hatch, Keypad, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, Segment, T } from './ui';
+import { aName, C, Confetti, F, Hatch, Keypad, LEVEL_COLORS, LEVEL_NAMES, Pop, Screen, Segment, T } from './ui';
 
 type Phase = 'speak' | 'ask' | 'right' | 'wrong';
 type Props = { settings: Settings; tables?: number[]; mastery: Mastery; onUpdate: (m: Mastery) => void; onSettings: (p: Partial<Settings>) => void; onDone: (s: GameSummary) => void; onBack: () => void };
@@ -14,11 +14,14 @@ type Props = { settings: Settings; tables?: number[]; mastery: Mastery; onUpdate
 const PRAISE = ['Awesome! 🎉', 'Great job! 🌟', 'You got it! 🙌', 'Super star! ⭐', 'Amazing! 🤩', 'Well done! 👏', 'Brilliant! 💡', 'Woohoo! 🥳'];
 const COMBOS: Record<number, string> = { 3: 'combo3', 5: 'combo5', 10: 'combo10' };
 const NO_MIC = 'No microphone. Use the keypad.';
+const FATAL = ['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'];
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+/** A partial transcript of these targets may still grow into a different number ("thirty" → "thirty six"). */
+const mayGrow = (n: number) => n < 10 || n % 10 === 0;
 
 export default function Game({ settings, tables, mastery, onUpdate, onSettings, onDone, onBack }: Props) {
   const { count, keypad } = settings;
-  const all = useRef(facts(tables ?? settings.tables, settings.upTo)).current;
+  const [all] = useState(() => facts(tables ?? settings.tables, settings.upTo));
   const [q, setQ] = useState<Q>(() => pick(mastery, all));
   const [phase, setPhase] = useState<Phase>('speak');
   const [heard, setHeard] = useState('');
@@ -27,24 +30,25 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
   const [levelUp, setLevelUp] = useState<[number, number] | null>(null);
   const [micError, setMicError] = useState('');
   const [unlock, setUnlock] = useState<{ tables: number[]; grands: Grand[] } | null>(null);
-  const st = useRef({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), alive: true, combo: 0, points: 0, results: [] as Result[], trophies: settings.trophies, won: [] as number[], retry: [] as { q: Q; at: number }[] }).current;
+  const [st] = useState(() => ({ m: mastery, q, phase: 'speak' as Phase, t0: Date.now(), tHeard: 0, micOk: true, alive: true, combo: 0, points: 0, results: [] as Result[], trophies: settings.trophies, won: [] as number[], retry: [] as { q: Q; at: number }[] }));
   const go = (p: Phase) => { st.phase = p; setPhase(p); };
 
   const listen = () => Speech.start({ lang: 'en-US', interimResults: true, continuous: false, maxAlternatives: 3 });
 
   /** Read the question aloud, then start the mic and the clock (so the app never hears itself). */
   const ask = async (next: Q) => {
-    Object.assign(st, { q: next, t0: Date.now() });
+    Object.assign(st, { q: next, t0: Date.now(), tHeard: 0 });
     setQ(next); setHeard(''); setTyped(''); setLevelUp(null); go('speak');
     await say(`q${next.a}x${next.b}`);
     if (!st.alive || st.q !== next || st.phase !== 'speak') return;
-    st.t0 = Date.now(); go('ask'); listen();
+    st.t0 = Date.now(); go('ask');
+    if (st.micOk) listen();
   };
 
   const answer = async (correct: boolean) => {
     if (st.phase !== 'ask' && st.phase !== 'speak') return;
     Speech.abort(); stopVoice();
-    const ms = Date.now() - st.t0, from = fact(st.m, st.q), to = grade(from, st.q, correct, ms);
+    const ms = (correct && st.tHeard ? st.tHeard : Date.now()) - st.t0, from = fact(st.m, st.q), to = grade(from, st.q, correct, ms);
     st.m = { ...st.m, [key(st.q)]: to };
     onUpdate(st.m);
     st.results.push({ q: st.q, correct, ms, from: from.l, to: to.l });
@@ -59,7 +63,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
       const up = to.l > from.l;
       if (up) { setLevelUp([from.l, to.l]); setTimeout(() => sfx('levelup'), 250); }
       const clip = COMBOS[st.combo] ?? (up ? 'levelup' : Math.random() < 0.5 ? `praise${1 + Math.floor(Math.random() * 8)}` : '');
-      await Promise.all([wait(1400), clip && wait(200).then(() => say(clip))]);
+      await Promise.all([wait(1400), clip && wait(200).then(() => { if (st.alive) return say(clip); })]);
       const { fresh, grands, all: have } = unlocks(st.m, settings.upTo, st.trophies);
       if (fresh.length && st.alive) {
         st.trophies = have; st.won.push(...fresh);
@@ -68,8 +72,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
         sfx('fanfare');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         await wait(700);
-        for (const t of fresh) await say(`trophy${t}`);
-        for (const g of grands) await say(g.id);
+        for (const id of [...fresh.map(t => `trophy${t}`), ...grands.map(g => g.id)]) if (st.alive) await say(id);
         await wait(1200);
         setUnlock(null);
       }
@@ -79,7 +82,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
       sfx('boink');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       await wait(600);
-      await say(`a${st.q.a}x${st.q.b}`);
+      if (st.alive) await say(`a${st.q.a}x${st.q.b}`);
       await wait(800);
     }
     if (!st.alive) return;
@@ -95,16 +98,23 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
     if (st.phase !== 'ask') return;
     const texts = e.results.map(r => r.transcript);
     setHeard(texts[0] ?? '');
-    const target = st.q.a * st.q.b;
-    if (texts.some(t => parseNumber(t) === target)) answer(true); // accept as soon as it's heard, even mid-sentence
-    else if (e.isFinal && texts[0] && parseNumber(texts[0]) !== null) answer(false);
+    const target = st.q.a * st.q.b, top = parseNumber(texts[0] ?? '');
+    if (!e.isFinal) {
+      // Accept a correct partial right away, unless the child may still be mid-number; then keep the time it was heard.
+      if (top === target) mayGrow(target) ? (st.tHeard ||= Date.now()) : answer(true);
+      return;
+    }
+    const said = top ?? texts.map(parseNumber).find(n => n !== null) ?? null; // alternatives only if the top result has no number
+    if (said !== null) answer(said === target);
   });
-  useSpeechRecognitionEvent('end', () => { if (st.phase === 'ask') setTimeout(() => st.phase === 'ask' && listen(), 150); });
-  useSpeechRecognitionEvent('error', e => { if (e.error === 'not-allowed') setMicError(NO_MIC); });
+  useSpeechRecognitionEvent('end', () => { if (st.phase === 'ask' && st.micOk) setTimeout(() => st.phase === 'ask' && listen(), 150); });
+  useSpeechRecognitionEvent('error', e => { if (FATAL.includes(e.error)) noMic(); });
+  const noMic = () => { st.micOk = false; setMicError(NO_MIC); onSettings({ keypad: true }); };
 
   useEffect(() => {
-    Speech.requestPermissionsAsync().then(p => { if (!p.granted) { setMicError(NO_MIC); onSettings({ keypad: true }); } });
-    ask(st.q);
+    Speech.requestPermissionsAsync()
+      .then(p => p.granted || noMic(), noMic)
+      .then(() => { if (st.alive) ask(st.q); });
     return () => { st.alive = false; st.phase = 'right'; Speech.abort(); stopVoice(); };
   }, []);
 
@@ -118,7 +128,7 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
   const fg = done ? '#fff' : C.ink;
   const lvl = fact(st.m, q).l;
   const num = st.results.length + (done ? 0 : 1);
-  const status = micError || { speak: 'Listen…', ask: keypad ? 'Say it or type it!' : 'Say the answer!', right: praise, wrong: 'Nice try!' }[phase];
+  const status = { speak: 'Listen…', ask: keypad ? 'Say it or type it!' : 'Say the answer!', right: praise, wrong: 'Nice try!' }[phase];
 
   return (
     <Screen onBack={onBack} bg={phase === 'right' ? C.good : phase === 'wrong' ? C.bad : C.bg} right={
@@ -135,8 +145,9 @@ export default function Game({ settings, tables, mastery, onUpdate, onSettings, 
         </View>
         <T bold style={[s.q, { color: fg }]} adjustsFontSizeToFit numberOfLines={1}>{q.a} × {q.b} = {phase === 'wrong' ? q.a * q.b : typed || '?'}</T>
         <T bold style={[s.status, { color: fg }]}>{status}</T>
+        {!!micError && !done && <T style={[s.heard, { color: fg }]}>{micError}</T>}
         {!!heard && !keypad && <T style={[s.heard, { color: fg }]}>“{heard}”</T>}
-        {levelUp && <View style={{ alignItems: 'center' }}><Hatch from={levelUp[0]} to={levelUp[1]} size={80} /><T bold style={[s.heard, { color: fg, opacity: 1 }]}>{q.a} × {q.b} grew into a {LEVEL_NAMES[levelUp[1] - 1].split(' ')[0]}!</T></View>}
+        {levelUp && <View style={{ alignItems: 'center' }}><Hatch from={levelUp[0]} to={levelUp[1]} size={80} /><T bold style={[s.heard, { color: fg, opacity: 1 }]}>{q.a} × {q.b} grew into {aName(levelUp[1])}!</T></View>}
       </View>
       {keypad && <Keypad value={typed} onChange={setTyped} onSubmit={() => answer(+typed === q.a * q.b)} disabled={done} />}
       {phase === 'right' && <Confetti key={num} count={st.combo >= 5 ? 70 : 35} />}

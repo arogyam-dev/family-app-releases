@@ -43,7 +43,7 @@ export default function App() {
   const home = () => go({ name: 'home' });
   const finish = (summary: GameSummary, tables?: number[]) => {
     const log = { at: Date.now(), correct: summary.results.filter(r => r.correct).length, total: summary.results.length, points: summary.points };
-    updateSettings({ stars: settings.stars + summary.stars, history: [...settings.history, log].slice(-50), ...(summary.best && { best: summary.points }) });
+    updateSettings({ stars: settings.stars + summary.stars, history: [...settings.history, log].slice(-50), games: Math.max(settings.games, settings.history.length) + 1, ...(summary.best && { best: summary.points }) });
     go({ name: 'results', summary, tables });
   };
 

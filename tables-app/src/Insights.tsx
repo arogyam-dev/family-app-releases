@@ -45,7 +45,7 @@ export default function Insights({ mastery, settings, onBack }: { mastery: Maste
           <Tile value={`${counts[4]}/${scope.length}`} label="Dragons 🐉" />
           <Tile value={`${Math.round((corrects / tries) * 100)}%`} label="Accuracy" />
           <Tile value={`${corrects ? (totalMs / corrects / 1000).toFixed(1) : '–'}s`} label="Avg speed" />
-          <Tile value={`${history.length}`} label="Games" />
+          <Tile value={`${Math.max(settings.games, history.length)}`} label="Games" />
           <Tile value={`${settings.trophies.length}/20`} label="Trophies 🏆" />
           <Tile value={`${settings.best}`} label="Best score" />
         </View>

@@ -3,7 +3,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { fact, facts, Mastery, Q, range, Settings, UP_TO_OPTIONS } from './logic';
 import { say, sfx } from './sound';
 import { Trophy } from './Trophies';
-import { Btn, C, Confetti, creature, F, Hatch, LEVEL_NAMES, Pop, Screen, T, Tile } from './ui';
+import { aName, Btn, C, Confetti, creature, F, Hatch, Pop, Screen, T, Tile } from './ui';
 
 export type Result = { q: Q; correct: boolean; ms: number; from: number; to: number };
 export type GameSummary = { results: Result[]; trophies: number[]; points: number; best: boolean; stars: number };
@@ -32,7 +32,6 @@ export function Home({ mastery, settings, onView, onPlay, onInsights, onTrophies
   const qs = facts(settings.tables.length ? settings.tables : range(1, 12), settings.upTo);
   const avg = qs.reduce((t, q) => t + fact(mastery, q).l, 0) / qs.length;
   const stage = Math.min(5, Math.floor(avg)), grow = stage === 5 ? 1 : avg - stage;
-  const name = LEVEL_NAMES[stage - 1].split(' ')[0];
   return (
     <Screen>
       <View style={s.topBar}>
@@ -42,7 +41,7 @@ export function Home({ mastery, settings, onView, onPlay, onInsights, onTrophies
       <View style={s.center}>
         <Pop><T style={{ fontSize: 140 }}>{creature(stage)}</T></Pop>
         <T bold style={s.h1}>Tables</T>
-        <T style={s.sub}>{stage === 5 ? 'Your buddy is a mighty Dragon!' : `Your buddy is ${/^[AEIOU]/.test(name) ? 'an' : 'a'} ${name}. Fast answers help it grow!`}</T>
+        <T style={s.sub}>{stage === 5 ? 'Your buddy is a mighty Dragon!' : `Your buddy is ${aName(stage)}. Fast answers help it grow!`}</T>
         <View style={s.grow}><View style={[s.growFill, { width: `${Math.max(grow * 100, 4)}%` }]} /></View>
       </View>
       <View style={{ gap: 12, paddingBottom: 8 }}>
@@ -124,7 +123,11 @@ export function Setup({ settings, onSettings, onStart, onBack }: { settings: Set
 const cheer = (pct: number) => pct >= 0.9 ? 'You are a superstar!' : pct >= 0.7 ? 'Awesome work!' : pct >= 0.4 ? 'Great practice!' : 'Keep going, you are learning!';
 
 export function Results({ summary: { results, trophies, points, best, stars }, onAgain, onHome }: { summary: GameSummary; onAgain: () => void; onHome: () => void }) {
-  useEffect(() => { sfx('fanfare'); setTimeout(() => say(best ? 'best' : 'done'), 900); }, []);
+  useEffect(() => {
+    sfx('fanfare');
+    const t = setTimeout(() => say(best ? 'best' : 'done'), 900);
+    return () => clearTimeout(t);
+  }, []);
   const right = results.filter(r => r.correct);
   const avg = right.length ? right.reduce((t, r) => t + r.ms, 0) / right.length / 1000 : 0;
   const ups = results.filter(r => r.to > r.from);

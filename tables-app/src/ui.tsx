@@ -10,6 +10,8 @@ export const F = { display: 72, title: 40, head: 26, body: 20, small: 15 };
 export const LEVEL_COLORS = ['#FF6B6B', '#FF9F43', '#FECA57', '#7BED9F', '#00B894'];
 export const LEVEL_NAMES = ['Egg 🥚', 'Chick 🐣', 'Bird 🐦', 'Eagle 🦅', 'Dragon 🐉'];
 export const creature = (l: number) => LEVEL_NAMES[l - 1].split(' ')[1];
+/** "a Chick", "an Eagle" */
+export const aName = (l: number) => { const n = LEVEL_NAMES[l - 1].split(' ')[0]; return `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}`; };
 
 /** Text in the app's rounded font. */
 export const T = ({ style, bold, ...p }: TextProps & { bold?: boolean }) => (
